@@ -9,18 +9,34 @@
 
 -(void)getTile:(NSMutableArray*)arguments withDict:(NSMutableDictionary*)options  
 {
+    self.callbackID = [arguments pop]; 
+    NSArray *bundledTileSets = [[NSBundle mainBundle] pathsForResourcesOfType:@"mbtiles" inDirectory:nil];
     
-    db = [[FMDatabase databaseWithPath:[tileSetURL relativePath]] retain];
+    NSAssert([bundledTileSets count] > 0, @"No bundled tile sets found in application");
+    NSString *path = [[bundledTileSets sortedArrayUsingSelector:@selector(compare:)] objectAtIndex:0];
+    // NSArray *tileCoord = [arguments objectAtIndex:0];
+    // NSInteger zoom = [tileCoord objectAtIndex:0];
+    // NSInteger x = [tileCoord objectAtIndex:1];
+    // NSInteger y = [tileCoord objectAtIndex:2];
+    NSInteger zoom = [NSNumber numberWithInt:[arguments objectAtIndex:0]];
+    NSInteger x = [arguments objectAtIndex:1];
+    NSInteger y = [arguments objectAtIndex:2];
     
+    FMDatabase *db = [FMDatabase
+        databaseWithPath:[NSURL fileURLWithPath:path]];
     
-    self.callbackID = [arguments pop];
-    NSArray *tileCoord = [arguments objectAtIndex:0];    
-    NSString* jsString = nil;
-    jsString = [NSString stringWithFormat: @"2"];
+    FMResultSet *results = [db executeQuery:@"select tile_data from tiles where zoom_level = ? and tile_column = ? and tile_row = ?", 
+                            [NSNumber numberWithInt:zoom], 
+                            [NSNumber numberWithInt:x], 
+                            [NSNumber numberWithInt:y]];
+    NSData *data = [results dataForColumn:@"tile_data"];
+    NSString* jsString = [NSString stringWithUTF8String:[data bytes]];
+
     PluginResult* pluginResult = [PluginResult
         resultWithStatus:PGCommandStatus_OK messageAsString:
             [jsString
                   stringByAddingPercentEscapesUsingEncoding:NSUTF8StringEncoding]];
+
     [super writeJavascript: [pluginResult toSuccessCallbackString:self.callbackID]];
 }
 

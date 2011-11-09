@@ -16,9 +16,9 @@ function appReady() {
             new mm.Location(tj.center[1], tj.center[0]),
                 tj.center[2]);
     });
-    var res = MBTiles.getTile([5,3,2],
+    var res = MBTiles.getTile([12,1170,2526],
         function() {
-            alert('success');
+            alert(arguments[0]);
         },
         function() {
             alert('failure');
