@@ -10,34 +10,56 @@
 -(void)getTile:(NSMutableArray*)arguments withDict:(NSMutableDictionary*)options  
 {
     self.callbackID = [arguments pop]; 
-    NSArray *bundledTileSets = [[NSBundle mainBundle] pathsForResourcesOfType:@"mbtiles" inDirectory:nil];
+    NSArray *coords = [[arguments objectAtIndex:0] componentsSeparatedByString:@","];
+    NSArray *bundledTileSets = [
+        [NSBundle mainBundle]
+        pathsForResourcesOfType:@"mbtiles" inDirectory:nil];
     
     NSAssert([bundledTileSets count] > 0, @"No bundled tile sets found in application");
     NSString *path = [[bundledTileSets sortedArrayUsingSelector:@selector(compare:)] objectAtIndex:0];
-    // NSArray *tileCoord = [arguments objectAtIndex:0];
-    // NSInteger zoom = [tileCoord objectAtIndex:0];
-    // NSInteger x = [tileCoord objectAtIndex:1];
-    // NSInteger y = [tileCoord objectAtIndex:2];
-    NSInteger zoom = [NSNumber numberWithInt:[arguments objectAtIndex:0]];
-    NSInteger x = [arguments objectAtIndex:1];
-    NSInteger y = [arguments objectAtIndex:2];
+    NSURL *pathUrl = [NSURL URLWithString: path];
+    PluginResult* pluginResult;
     
-    FMDatabase *db = [FMDatabase
-        databaseWithPath:[NSURL fileURLWithPath:path]];
-    
-    FMResultSet *results = [db executeQuery:@"select tile_data from tiles where zoom_level = ? and tile_column = ? and tile_row = ?", 
-                            [NSNumber numberWithInt:zoom], 
-                            [NSNumber numberWithInt:x], 
-                            [NSNumber numberWithInt:y]];
-    NSData *data = [results dataForColumn:@"tile_data"];
-    NSString* jsString = [NSString stringWithUTF8String:[data bytes]];
+    // NSLog("%@", [pathUrl relativePath]);
 
-    PluginResult* pluginResult = [PluginResult
+    FMDatabase *db = [FMDatabase
+        databaseWithPath:[pathUrl relativePath]];
+    
+    if (![db open]) {
+        pluginResult = [PluginResult
+            resultWithStatus:PGCommandStatus_ERROR
+            messageAsString:@"database is not open."];
+        [super writeJavascript: [pluginResult toErrorCallbackString:self.callbackID]];
+        return nil;
+    }
+    
+    FMResultSet *results = [db executeQuery:@"select tile_data \
+                            from tiles where zoom_level = ? \
+                            and tile_column = ? and tile_row = ?", 
+                            [coords objectAtIndex:0], 
+                            [coords objectAtIndex:1], 
+                            [coords objectAtIndex:2]];
+    if ([db hadError]) {
+        NSString *errMessage = [NSString stringWithFormat:@"database error: %@", [db lastErrorMessage]];
+        pluginResult = [PluginResult resultWithStatus:PGCommandStatus_ERROR messageAsString:errMessage];
+        [super writeJavascript: [pluginResult toErrorCallbackString:self.callbackID]];
+    } else {
+        
+        NSData *data = [results dataForColumn:@"tile_data"];
+        NSString* jsString = [NSString stringWithUTF8String:[data bytes]];
+
+        PluginResult* pluginResult = [PluginResult
         resultWithStatus:PGCommandStatus_OK messageAsString:
             [jsString
                   stringByAddingPercentEscapesUsingEncoding:NSUTF8StringEncoding]];
 
-    [super writeJavascript: [pluginResult toSuccessCallbackString:self.callbackID]];
+        [super writeJavascript: [pluginResult toSuccessCallbackString:self.callbackID]];
+    }
+}
+
+- (void)didReceiveMemoryWarning
+{
+    NSLog(@"*** didReceiveMemoryWarning in %@", [self class]);
 }
 
 // #pragma mark -
@@ -72,16 +94,6 @@
     [db release];
     
 	[super dealloc];
-}
-
-- (int)tileSideLength
-{
-	return tileProjection.tileSideLength;
-}
-
-- (void)setTileSideLength:(NSUInteger)aTileSideLength
-{
-	[tileProjection setTileSideLength:aTileSideLength];
 }
 
 - (RMTileImage *)tileImage:(RMTile)tile
@@ -119,149 +131,7 @@
     return image;
 }
 
-- (NSString *)tileURL:(RMTile)tile
-{
-    return nil;
-}
 
-- (NSString *)tileFile:(RMTile)tile
-{
-    return nil;
-}
-
-- (NSString *)tilePath
-{
-    return nil;
-}
-
-- (id <RMMercatorToTileProjection>)mercatorToTileProjection
-{
-	return [[tileProjection retain] autorelease];
-}
-
-- (RMProjection *)projection
-{
-	return [RMProjection googleProjection];
-}
-
-- (float)minZoom
-{
-    FMResultSet *results = [db executeQuery:@"select min(zoom_level) from tiles"];
-    
-    if ([db hadError]) {
-        return kMBTilesDefaultMinTileZoom;
-    }
-    
-    [results next];
-    
-    double minZoom = [results doubleForColumnIndex:0];
-    
-    [results close];
-    
-    return (float)minZoom;
-}
-
-- (float)maxZoom
-{
-    FMResultSet *results = [db executeQuery:@"select max(zoom_level) from tiles"];
-    
-    if ([db hadError]) {
-        return kMBTilesDefaultMaxTileZoom;
-    }
-    
-    [results next];
-    
-    double maxZoom = [results doubleForColumnIndex:0];
-    
-    [results close];
-    
-    return (float)maxZoom;
-}
-
-- (void)setMinZoom:(NSUInteger)aMinZoom
-{
-    [tileProjection setMinZoom:aMinZoom];
-}
-
-- (void)setMaxZoom:(NSUInteger)aMaxZoom
-{
-    [tileProjection setMaxZoom:aMaxZoom];
-}
-
-- (RMSphericalTrapezium)latitudeLongitudeBoundingBox
-{
-    return kMBTilesDefaultLatLonBoundingBox;
-}
-
-- (void)didReceiveMemoryWarning
-{
-    NSLog(@"*** didReceiveMemoryWarning in %@", [self class]);
-}
-
-- (NSString *)uniqueTilecacheKey
-{
-    return [NSString stringWithFormat:@"MBTiles%@", [[db databasePath] lastPathComponent]];
-}
-
-- (NSString *)shortName
-{
-    FMResultSet *results = [db executeQuery:@"select value from metadata where name = 'name'"];
-    
-    if ([db hadError])
-        return @"Unknown MBTiles";
-    
-    [results next];
-    
-    NSString *shortName = [results stringForColumnIndex:0];
-    
-    [results close];
-    
-    return shortName;
-}
-
-- (NSString *)longDescription
-{
-    FMResultSet *results = [db executeQuery:@"select value"
-        "from metadata where name = 'description'"];
-    
-    if ([db hadError]) {
-        return @"Unknown MBTiles description";
-    }
-    
-    [results next];
-    
-    NSString *description = [results stringForColumnIndex:0];
-    
-    [results close];
-    
-    return [NSString stringWithFormat:@"%@ - %@", [self shortName], description];
-}
-
-- (NSString *)shortAttribution
-{
-    FMResultSet *results = [db executeQuery:@"select value from metadata where name = 'attribution'"];
-    
-    if ([db hadError])
-        return @"Unknown MBTiles attribution";
-    
-    [results next];
-    
-    NSString *attribution = [results stringForColumnIndex:0];
-    
-    [results close];
-    
-    return attribution;
-}
-
-- (NSString *)longAttribution
-{
-    return [NSString stringWithFormat:@"%@ - %@", [self shortName], [self shortAttribution]];
-}
-
-- (void)removeAllCachedImages
-{
-    NSLog(@"*** removeAllCachedImages in %@", [self class]);
-}
 */
 
 @end
