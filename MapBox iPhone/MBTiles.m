@@ -17,10 +17,10 @@
     
     NSAssert([bundledTileSets count] > 0, @"No bundled tile sets found in application");
     NSString *path = [[bundledTileSets sortedArrayUsingSelector:@selector(compare:)] objectAtIndex:0];
-    NSURL *pathUrl = [NSURL URLWithString: path];
+    NSURL *pathUrl = [NSURL fileURLWithPath: path];
     PluginResult* pluginResult;
     
-    // NSLog("%@", [pathUrl relativePath]);
+    NSLog(@"%@", [pathUrl relativeString]);
 
     FMDatabase *db = [FMDatabase
         databaseWithPath:[pathUrl relativePath]];
@@ -33,9 +33,8 @@
         return nil;
     }
     
-    FMResultSet *results = [db executeQuery:@"select tile_data \
-                            from tiles where zoom_level = ? \
-                            and tile_column = ? and tile_row = ?", 
+
+    FMResultSet *results = [db executeQuery:@"select tile_data from tiles where zoom_level = ? and tile_column = ? and tile_row = ?", 
                             [coords objectAtIndex:0], 
                             [coords objectAtIndex:1], 
                             [coords objectAtIndex:2]];
@@ -46,8 +45,8 @@
     } else {
         
         NSData *data = [results dataForColumn:@"tile_data"];
-        NSString* jsString = [NSString stringWithUTF8String:[data bytes]];
-
+        NSString *jsString = [NSString stringWithUTF8String:[data bytes]];
+        NSLog(@"got tile");
         PluginResult* pluginResult = [PluginResult
         resultWithStatus:PGCommandStatus_OK messageAsString:
             [jsString
