@@ -1,6 +1,7 @@
 //
 //  MBTiles.m
 #import "MBTiles.h"
+#import "QSStrings.h"
 #import "FMDatabase.h"
 
 @implementation MBTiles 
@@ -34,7 +35,7 @@
     }
     
 
-    FMResultSet *results = [db executeQuery:@"select tile_data from tiles where zoom_level = ? and tile_column = ? and tile_row = ?", 
+    FMResultSet *results = [db executeQuery:@"select tile_data from tiles where zoom_level = ? and tile_column = ? and tile_row = ?;", 
                             [coords objectAtIndex:0], 
                             [coords objectAtIndex:1], 
                             [coords objectAtIndex:2]];
@@ -43,15 +44,17 @@
         pluginResult = [PluginResult resultWithStatus:PGCommandStatus_ERROR messageAsString:errMessage];
         [super writeJavascript: [pluginResult toErrorCallbackString:self.callbackID]];
     } else {
-        
+        [results next];
         NSData *data = [results dataForColumn:@"tile_data"];
-        NSString *jsString = [NSString stringWithUTF8String:[data bytes]];
-        NSLog(@"got tile");
+        [QSStrings initialize];
+        NSString *jsString = [QSStrings encodeBase64WithData:data];
+        //NSString *jsString = [[NSString alloc] initWithData:data encoding:NSUTF8StringEncoding];
+        // NSLog(@"got tile: %s", data);
         PluginResult* pluginResult = [PluginResult
         resultWithStatus:PGCommandStatus_OK messageAsString:
             [jsString
                   stringByAddingPercentEscapesUsingEncoding:NSUTF8StringEncoding]];
-
+        
         [super writeJavascript: [pluginResult toSuccessCallbackString:self.callbackID]];
     }
 }
