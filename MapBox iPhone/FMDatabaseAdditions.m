@@ -54,7 +54,7 @@ return ret;
 
 //check if table exist in database (patch from OZLB)
 - (BOOL)tableExists:(NSString*)tableName {
-    
+
     BOOL returnBool;
     //lower case table name
     tableName = [tableName lowercaseString];
@@ -64,33 +64,33 @@ return ret;
     returnBool = [rs next];
     //close and free object
     [rs close];
-    
+
     return returnBool;
 }
 
 //get table with list of tables: result colums: type[STRING], name[STRING],tbl_name[STRING],rootpage[INTEGER],sql[STRING]
 //check if table exist in database  (patch from OZLB)
 - (FMResultSet*)getSchema {
-    
+
     //result colums: type[STRING], name[STRING],tbl_name[STRING],rootpage[INTEGER],sql[STRING]
     FMResultSet *rs = [self executeQuery:@"SELECT type, name, tbl_name, rootpage, sql FROM (SELECT * FROM sqlite_master UNION ALL SELECT * FROM sqlite_temp_master) WHERE type != 'meta' AND name NOT LIKE 'sqlite_%' ORDER BY tbl_name, type DESC, name"];
-    
+
     return rs;
 }
 
 //get table schema: result colums: cid[INTEGER], name,type [STRING], notnull[INTEGER], dflt_value[],pk[INTEGER]
 - (FMResultSet*)getTableSchema:(NSString*)tableName {
-    
+
     //result colums: cid[INTEGER], name,type [STRING], notnull[INTEGER], dflt_value[],pk[INTEGER]
     FMResultSet *rs = [self executeQuery:[NSString stringWithFormat: @"PRAGMA table_info(%@)", tableName]];
-    
+
     return rs;
 }
 
 
 //check if column exist in table
 - (BOOL)columnExists:(NSString*)tableName columnName:(NSString*)columnName {
-    
+
     BOOL returnBool = NO;
     //lower case table name
     tableName = [tableName lowercaseString];
@@ -107,7 +107,7 @@ return ret;
     }
     //close and free object
     [rs close];
-    
+
     return returnBool;
 }
 
@@ -116,7 +116,7 @@ return ret;
     BOOL validationSucceeded = YES;
     BOOL keepTrying = YES;
     int numberOfRetries = 0;
-    
+
     [self setInUse:YES];
     while (keepTrying == YES) {
         keepTrying = NO;
@@ -124,26 +124,26 @@ return ret;
         if (rc == SQLITE_BUSY || rc == SQLITE_LOCKED) {
             keepTrying = YES;
             usleep(20);
-            
+
             if (busyRetryTimeout && (numberOfRetries++ > busyRetryTimeout)) {
                 NSLog(@"%s:%d Database busy (%@)", __FUNCTION__, __LINE__, [self databasePath]);
                 NSLog(@"Database busy");
-            }          
-        } 
+            }
+        }
         else if (rc != SQLITE_OK) {
             validationSucceeded = NO;
             if (error) {
-                *error = [NSError errorWithDomain:NSCocoaErrorDomain 
+                *error = [NSError errorWithDomain:NSCocoaErrorDomain
                                              code:[self lastErrorCode]
-                                         userInfo:[NSDictionary dictionaryWithObject:[self lastErrorMessage] 
+                                         userInfo:[NSDictionary dictionaryWithObject:[self lastErrorMessage]
                                                                               forKey:NSLocalizedDescriptionKey]];
             }
         }
     }
-    
+
     [self setInUse:NO];
     sqlite3_finalize(pStmt);
-    
+
     return validationSucceeded;
 }
 

@@ -2,13 +2,13 @@
 #import <PhoneGap/PGPlugin.h>
 
 @interface MBTiles : PGPlugin {
-    
-    NSString* callbackID;  
+
+    NSString* callbackID;
 }
 
 @property (nonatomic, copy) NSString* callbackID;
 
-//Instance Method  
+//Instance Method
 - (void) getTile:(NSMutableArray*)arguments withDict:(NSMutableDictionary*)options;
 
 @end
